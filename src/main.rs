@@ -43,17 +43,12 @@ fn str_to_num(s: String) -> u32 {
     n
 }
 
-fn score_number(word: u32) -> u32 {
+fn score_number(word: u32, letter_score: &[u32;26]) -> u32 {
     let mut score = 0;
-    let score_str = "etaoinshrdlucwmfygpbvkxjqz";
-    let mut score_map = vec![0;26];
-    for i in 0..26 {
-        score_map[(score_str.chars().nth(i).unwrap() as u32 - 'a' as u32) as usize] = 1 << (26-i);
-    }
     for i in 0..=26 {
         let n = (word >> i) & 1;
         if n != 0 {
-            score += score_map[i];
+            score += letter_score[i];
         }
     }
     score
@@ -104,18 +99,36 @@ fn main() {
     let mut words = Vec::new();
     let mut words_complete = Vec::new();
     let mut history = [0;5];
+    let mut letter_freq_map = vec![(0,0);26];
+    for i in 0..26 {
+        letter_freq_map[i].1 = i;
+    }
     for line in lines {
         let l = line.unwrap();
         let n = str_to_num(l.clone());
         if n != 0 && words.contains(&n) == false {
             words.push(n);
+            for i in 0..=25 {
+                if (n >> i) & 1 == 1 {
+                    letter_freq_map[i].0 += 1 as u32;
+                }
+            }
         }
         words_complete.push((l, n));
     }
-    words.sort_by(|a, b| score_number(*a).partial_cmp(&score_number(*b)).unwrap());
+
+    letter_freq_map.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    let mut letter_score = [0;26];
+    for i in 0..26 {
+        letter_score[letter_freq_map[i].1] = (1 << i) as u32;
+    }
+
+    words.sort_by(|a, b| score_number(*a, &letter_score).partial_cmp(&score_number(*b, &letter_score)).unwrap());
     words_complete.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    
     let skip_table = gen_skip_table(words.clone());
     find_sols(0, 0, 0, &words, &words_complete, &skip_table, &mut history);
+
     let elapsed = now.elapsed();
     println!("\nElapsed: {:.2?}", elapsed);
 }
