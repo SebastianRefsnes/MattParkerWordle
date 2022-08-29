@@ -22,7 +22,7 @@ fn num_to_str(n: u32, all_words: &Vec<(String, u32)>) -> String {
     }
     res.push_str("  ");
     let mut flag = false;
-    while all_words[low].1 == n {
+    while low < all_words.len() && all_words[low].1 == n {
         if flag {
             res.push_str(" | ");
         }
