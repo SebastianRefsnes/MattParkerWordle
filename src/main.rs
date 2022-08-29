@@ -68,12 +68,14 @@ fn gen_skip_table(words: Vec<u32>) -> Vec<u16> {
     res
 }
 
-fn find_sols(depth: u32, me: u32, comparer: u32, words: &Vec<u32>, all_words: &Vec<(String, u32)>, skip_table: &Vec<u16>, history: &mut[u32;5]) {
+fn find_sols(depth: u32, me: u32, comparer: u32, words: &Vec<u32>, all_words: &Vec<(String, u32)>, skip_table: &Vec<u16>, history: &mut[u32;5], total_sols: &mut u32) {
     if depth == 1 {
-        print!("\rchecking starting word {}/{}\r", me + 1, words.len());
+        print!("\rstarting word {}/{}\r", me + 1, words.len());
         stdout().flush().unwrap();
     }
     if depth == 5 {
+        *total_sols += 1;
+        println!("   --- SOLUTION {} ---\n", total_sols);
         let mut combined = 0;
         for i in 0..5 {
             combined |= history[i];
@@ -87,7 +89,7 @@ fn find_sols(depth: u32, me: u32, comparer: u32, words: &Vec<u32>, all_words: &V
             continue;
         }
         history[depth as usize] = words[number];
-        find_sols(depth + 1, number as u32, comparer | words[number], words, all_words, skip_table, history);
+        find_sols(depth + 1, number as u32, comparer | words[number], words, all_words, skip_table, history, total_sols);
     }
     
 }
@@ -127,8 +129,9 @@ fn main() {
     words_complete.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
     
     let skip_table = gen_skip_table(words.clone());
-    find_sols(0, 0, 0, &words, &words_complete, &skip_table, &mut history);
-
+    let mut total_solutions = 0;
+    find_sols(0, 0, 0, &words, &words_complete, &skip_table, &mut history, &mut total_solutions);
     let elapsed = now.elapsed();
     println!("\nElapsed: {:.2?}", elapsed);
+    println!("{} solutions were found", total_solutions);
 }
