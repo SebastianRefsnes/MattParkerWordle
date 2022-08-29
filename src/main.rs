@@ -34,7 +34,7 @@ fn num_to_str(n: u32, all_words: &Vec<(String, u32)>) -> String {
 }
 fn str_to_num(s: String) -> u32 {
     let mut n = 0;
-    for(_i, c) in s.chars().enumerate() {
+    for c in s.chars() {
         if 1 == n >> (c as u32 - 'a' as u32) & 1 {
             return 0;
         }
@@ -46,8 +46,7 @@ fn str_to_num(s: String) -> u32 {
 fn score_number(word: u32, letter_score: &[u32;26]) -> u32 {
     let mut score = 0;
     for i in 0..=26 {
-        let n = (word >> i) & 1;
-        if n != 0 {
+        if 0 != (word >> i) & 1 {
             score += letter_score[i];
         }
     }
