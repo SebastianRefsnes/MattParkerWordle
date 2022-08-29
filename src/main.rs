@@ -105,6 +105,7 @@ fn main() {
     }
     for line in lines {
         let l = line.unwrap();
+        if l.len() != 5 { continue };
         let n = str_to_num(l.clone());
         if n != 0 && words.contains(&n) == false {
             words.push(n);
