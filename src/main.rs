@@ -88,6 +88,7 @@ fn find_sols(depth: u32, me: u32, comparer: u32, words: &Vec<u32>, skip_table: &
     
 }
 fn main() {
+    assert!(WORD_LENGTH < 27, "This only works for words that are less than 27 in length, sorry!");
     use std::time::Instant;
     let now = Instant::now();
     let lines = io::BufReader::new(File::open("./src/words.txt").unwrap()).lines();

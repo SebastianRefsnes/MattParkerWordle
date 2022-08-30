@@ -1,6 +1,6 @@
 # MattParkerWordle
 
-Small rust program written to find combinations of five five letter words that do not have any letters in common.
+Small rust program written to find combinations of n, n letter words that do not have any letters in common (for n < 27)
 This could for example be:
   nymph
   fjord
