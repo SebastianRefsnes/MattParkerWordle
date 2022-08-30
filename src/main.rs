@@ -1,6 +1,8 @@
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, stdout, Write};
 use std::thread;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 extern crate num_cpus;
 
@@ -142,11 +144,13 @@ fn main() {
     let skip_table = gen_skip_table(words.clone());
 
     println!("Computing solutions...\n");
+    let current_status = Arc::new(Mutex::new(0));
 
     let mut handles = Vec::new();
     for thread_id in 0..cpu_to_use {
         let thread_words = words.clone();
         let thread_skip_table = skip_table.clone();
+        let thread_arc = current_status.clone();
         let handle = thread::spawn(move || {
             let mut history = [0;WORD_LENGTH];
             let mut solutions = Vec::new();
@@ -154,16 +158,48 @@ fn main() {
                 if num % cpu_to_use == thread_id {
                     history[0] = thread_words[num];
                     find_sols(1, num as u32, thread_words[num], &thread_words, &thread_skip_table, &mut history, &mut solutions);
+                    let mut x = thread_arc.lock().unwrap();
+                    *x += 1;
                 }
             }
             solutions
         });
         handles.push(handle);
     }
+    let thread_arc = current_status.clone();
+    let total_words = words.len();
+
+    //This threads only job is to monitor how much work the other threads have done
+    let handle = thread::spawn(move || {
+        loop {
+            let x = thread_arc.lock().unwrap();
+            let curr_perc = (((*x as f32 / total_words as f32) * 100.0) as i32).min(100);
+            //Need to free the lock or the program will wait here forever
+            drop(x);
+
+            let mut bar = "[".to_string();
+            for _ in 0..(curr_perc / 2) {
+                bar += "#";
+            }
+            for _ in (curr_perc / 2)..50 {
+                bar += ".";
+            }
+            bar += "]";
+            print!("\r{}\r", bar + &format!(" {:03}% ", curr_perc));
+            stdout().flush().unwrap();
+            if curr_perc == 100 {
+                return;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    });
+
     let mut all_solutions = Vec::new();
     for h in handles {
         all_solutions.append(&mut h.join().unwrap());
     }
+    let _ = handle.join().unwrap();
+    println!("");
     for (i, solution) in all_solutions.clone().into_iter().enumerate() {
         println!("   --- SOLUTION {} ---\n", i + 1);
         let mut combined = 0;
