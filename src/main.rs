@@ -1,5 +1,10 @@
 use std::fs::File;
-use std::io::{self, BufRead, stdout, Write};
+use std::io::{self, BufRead};
+use std::thread;
+
+extern crate num_cpus;
+
+const WORD_LENGTH: usize = 5;
 
 fn num_to_str(n: u32, all_words: &Vec<(String, u32)>) -> String {
     let mut res = String::default();
@@ -68,28 +73,17 @@ fn gen_skip_table(words: Vec<u32>) -> Vec<u16> {
     res
 }
 
-fn find_sols(depth: u32, me: u32, comparer: u32, words: &Vec<u32>, all_words: &Vec<(String, u32)>, skip_table: &Vec<u16>, history: &mut[u32;5], total_sols: &mut u32) {
-    if depth == 1 {
-        print!("\rstarting word {}/{}\r", me + 1, words.len());
-        stdout().flush().unwrap();
-    }
-    if depth == 5 {
-        *total_sols += 1;
-        println!("   --- SOLUTION {} ---\n", total_sols);
-        let mut combined = 0;
-        for i in 0..5 {
-            combined |= history[i];
-            println!("{}", num_to_str(history[i], all_words));
-        }
-        println!("{}\n", num_to_str(combined, all_words));
+fn find_sols(depth: u32, me: u32, comparer: u32, words: &Vec<u32>, skip_table: &Vec<u16>, history: &mut [u32;WORD_LENGTH], solutions: &mut Vec<[u32;WORD_LENGTH]>) {
+    if depth == WORD_LENGTH as u32 {
+        solutions.push(*history);
         return;
     }
     for number in (me as usize + if depth != 0 { skip_table[me as usize] } else { 0 } as usize)..words.len() {
-        if (comparer & words[number as usize]) != 0 {
+        if (comparer & words[number]) != 0 {
             continue;
         }
         history[depth as usize] = words[number];
-        find_sols(depth + 1, number as u32, comparer | words[number], words, all_words, skip_table, history, total_sols);
+        find_sols(depth + 1, number as u32, comparer | words[number], words, skip_table, history, solutions);
     }
     
 }
@@ -99,14 +93,28 @@ fn main() {
     let lines = io::BufReader::new(File::open("./src/words.txt").unwrap()).lines();
     let mut words = Vec::new();
     let mut words_complete = Vec::new();
-    let mut history = [0;5];
     let mut letter_freq_map = vec![(0,0);26];
+    let mut cpu_to_use = (num_cpus::get() - 1).max(1);
+
+    for arg in std::env::args().skip(1) {
+        let pair = arg.split("=").collect::<Vec<&str>>();
+        let key = pair[0];
+        let val = pair[1.min(pair.len() - 1)];
+
+        match key {
+            "numthreads" => {
+                cpu_to_use = val.parse::<usize>().unwrap_or(cpu_to_use);
+            }
+            _ => {
+            }
+        }
+    }
     for i in 0..26 {
         letter_freq_map[i].1 = i;
     }
     for line in lines {
         let l = line.unwrap();
-        if l.len() != 5 { continue };
+        if l.len() != WORD_LENGTH { continue };
         let n = str_to_num(l.clone());
         if n != 0 && words.contains(&n) == false {
             words.push(n);
@@ -129,9 +137,42 @@ fn main() {
     words_complete.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
     
     let skip_table = gen_skip_table(words.clone());
-    let mut total_solutions = 0;
-    find_sols(0, 0, 0, &words, &words_complete, &skip_table, &mut history, &mut total_solutions);
+
+    println!("Computing solutions...\n");
+
+    let mut handles = Vec::new();
+    for thread_id in 0..cpu_to_use {
+        let thread_words = words.clone();
+        let thread_skip_table = skip_table.clone();
+        let handle = thread::spawn(move || {
+            let mut history = [0;WORD_LENGTH];
+            let mut solutions = Vec::new();
+            for num in 0..thread_words.len() {
+                if num % cpu_to_use == thread_id {
+                    history[0] = thread_words[num];
+                    find_sols(1, num as u32, thread_words[num], &thread_words, &thread_skip_table, &mut history, &mut solutions);
+                }
+            }
+            solutions
+        });
+        handles.push(handle);
+    }
+    let mut all_solutions = Vec::new();
+    for h in handles {
+        all_solutions.append(&mut h.join().unwrap());
+    }
+    for (i, solution) in all_solutions.clone().into_iter().enumerate() {
+        println!("   --- SOLUTION {} ---\n", i + 1);
+        let mut combined = 0;
+        for i in 0..WORD_LENGTH {
+            combined |= solution[i];
+            println!("{}", num_to_str(solution[i], &words_complete));
+        }
+        println!("{}\n", num_to_str(combined, &words_complete));
+    }
+    if all_solutions.len() == 0 {
+        println!("No solutions found ):");
+    }
     let elapsed = now.elapsed();
     println!("\nElapsed: {:.2?}", elapsed);
-    println!("{} solutions were found", total_solutions);
 }
